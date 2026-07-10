@@ -4,357 +4,318 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
-import { useFetcher } from "react-router";
+import { useFetcher, useLoaderData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+import { authenticate } from "../shopify.server";
+import { captureStoreSnapshot, scoreSnapshot } from "../lib/domain/store-health";
+import type { HealthReport } from "../lib/domain/store-health";
+import { logger } from "../lib/telemetry/logger.server";
+import { newTraceId } from "../lib/ids";
+import { AppError } from "../lib/errors";
+import type { Severity } from "../lib/domain/enums";
 
-  return null;
+/**
+ * Home / Dashboard (docs/14) — the merchant's daily surface. Replaces the
+ * Shopify template demo. It answers "Is my store healthy? What should I do next?"
+ * from a real, bounded Store Health quick scan (docs/07 F-01) run server-side in
+ * the loader. States follow docs/14: first-run (no products), healthy (no
+ * findings), steady (findings list), and section-level error (scan failed) —
+ * never a blank page (docs/40). The heavier queued scan + ROI/history sections
+ * land with M1.T5/M1.T7 and the DB cutover.
+ */
+
+interface DashboardData {
+  shop: string;
+  report: HealthReport | null;
+  scanError: boolean;
+}
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { admin, session } = await authenticate.admin(request);
+  const traceId = newTraceId();
+  const log = logger.child({ traceId, shop: session.shop });
+
+  try {
+    const snapshot = await captureStoreSnapshot(admin, {
+      shopDomain: session.shop,
+      capturedAt: new Date().toISOString(),
+    });
+    const report = scoreSnapshot(snapshot);
+    log.info("dashboard.scan.ok", {
+      overallScore: report.overallScore,
+      findings: report.findings.length,
+      sample: report.sampleSize,
+    });
+    return { shop: session.shop, report, scanError: false } satisfies DashboardData;
+  } catch (error) {
+    log.error("dashboard.scan.failed", { err: AppError.from(error, traceId) });
+    return { shop: session.shop, report: null, scanError: true } satisfies DashboardData;
+  }
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
-            id
-            title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  price
-                  barcode
-                  createdAt
-                }
-              }
-            }
-            demoInfo: metafield(namespace: "$app", key: "demo_info") {
-              jsonValue
-            }
-          }
-        }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
-          metafields: [
-            {
-              namespace: "$app",
-              key: "demo_info",
-              value: "Created by React Router Template",
-            },
-          ],
-        },
-      },
-    },
-  );
-  const responseJson = await response.json();
+  // "Run scan" re-runs the quick scan on demand (docs/14). The queued background
+  // scan (docs/17, M1.T5) supersedes this once the worker + DB land.
+  const { admin, session } = await authenticate.admin(request);
+  const traceId = newTraceId();
+  const log = logger.child({ traceId, shop: session.shop });
 
-  const product = responseJson.data!.productCreate!.product!;
-  const variantId = product.variants.edges[0]!.node!.id!;
-
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyReactRouterTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
-      }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
-
-  const variantResponseJson = await variantResponse.json();
-
-  const metaobjectResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyReactRouterTemplateUpsertMetaobject($handle: MetaobjectHandleInput!, $metaobject: MetaobjectUpsertInput!) {
-      metaobjectUpsert(handle: $handle, metaobject: $metaobject) {
-        metaobject {
-          id
-          handle
-          title: field(key: "title") {
-            jsonValue
-          }
-          description: field(key: "description") {
-            jsonValue
-          }
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }`,
-    {
-      variables: {
-        handle: {
-          type: "$app:example",
-          handle: "demo-entry",
-        },
-        metaobject: {
-          fields: [
-            { key: "title", value: "Demo Entry" },
-            {
-              key: "description",
-              value:
-                "This metaobject was created by the Shopify app template to demonstrate the metaobject API.",
-            },
-          ],
-        },
-      },
-    },
-  );
-
-  const metaobjectResponseJson = await metaobjectResponse.json();
-
-  return {
-    product: responseJson!.data!.productCreate!.product,
-    variant:
-      variantResponseJson!.data!.productVariantsBulkUpdate!.productVariants,
-    metaobject:
-      metaobjectResponseJson!.data!.metaobjectUpsert!.metaobject,
-  };
+  try {
+    const snapshot = await captureStoreSnapshot(admin, {
+      shopDomain: session.shop,
+      capturedAt: new Date().toISOString(),
+    });
+    const report = scoreSnapshot(snapshot);
+    log.info("dashboard.rescan.ok", { overallScore: report.overallScore });
+    return { report, scanError: false };
+  } catch (error) {
+    log.error("dashboard.rescan.failed", { err: AppError.from(error, traceId) });
+    return { report: null, scanError: true };
+  }
 };
 
-export default function Index() {
-  const fetcher = useFetcher<typeof action>();
+/* --------------------------------------------------------------- View --- */
 
+/** Valid `s-badge` tones (subset of Polaris badge tones we use). */
+type BadgeTone = "info" | "success" | "warning" | "critical";
+
+const SEVERITY_TONE: Record<Severity, BadgeTone> = {
+  CRITICAL: "critical",
+  HIGH: "warning",
+  MEDIUM: "warning",
+  LOW: "info",
+  INFO: "info",
+};
+
+function scoreTone(score: number): BadgeTone {
+  if (score >= 80) return "success";
+  if (score >= 60) return "warning";
+  return "critical";
+}
+
+function scoreLabel(score: number): string {
+  if (score >= 80) return "Healthy";
+  if (score >= 60) return "Needs attention";
+  return "At risk";
+}
+
+function formatAsOf(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+const DOMAIN_LABELS: Record<string, string> = {
+  seo: "SEO",
+  cro: "Conversion",
+  content: "Content",
+  catalog: "Catalog",
+  performance: "Performance",
+  inventory: "Inventory",
+};
+
+export default function Dashboard() {
+  const initial = useLoaderData<typeof loader>();
+  const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
-  const isLoading =
+
+  const isScanning =
     ["loading", "submitting"].includes(fetcher.state) &&
     fetcher.formMethod === "POST";
 
-  useEffect(() => {
-    if (fetcher.data?.product?.id) {
-      shopify.toast.show("Product created");
-    }
-  }, [fetcher.data?.product?.id, shopify]);
+  // Prefer a fresh re-scan result over the initial loader snapshot.
+  const report = fetcher.data?.report ?? initial.report;
+  const scanError = fetcher.data ? fetcher.data.scanError : initial.scanError;
 
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
+  useEffect(() => {
+    if (fetcher.data && !fetcher.data.scanError) {
+      shopify.toast.show("Store Health scan complete");
+    }
+  }, [fetcher.data, shopify]);
+
+  const runScan = () => fetcher.submit({}, { method: "POST" });
+
+  const storeName = initial.shop.replace(/\.myshopify\.com$/, "");
 
   return (
-    <s-page heading="Shopify app template">
-      <s-button slot="primary-action" onClick={generateProduct}>
-        Generate a product
+    <s-page heading="Store Health">
+      <s-button
+        slot="primary-action"
+        onClick={runScan}
+        {...(isScanning ? { loading: true } : {})}
+      >
+        Run scan
       </s-button>
 
-      <s-section heading="Congrats on creating a new Shopify app 🎉">
+      <s-section heading={`Welcome back, ${storeName}`}>
         <s-paragraph>
-          This embedded app template uses{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/tools/app-bridge"
-            target="_blank"
-          >
-            App Bridge
-          </s-link>{" "}
-          interface examples like an{" "}
-          <s-link href="/app/additional">additional page in the app nav</s-link>
-          , as well as an{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            Admin GraphQL
-          </s-link>{" "}
-          mutation demo, to provide a starting point for app development.
+          TryMerchantAI continuously checks your store for issues that cost you
+          sales and ranking, then hands you the highest-impact fixes first.
         </s-paragraph>
-      </s-section>
-      <s-section heading="Get started with products">
-        <s-paragraph>
-          Generate a product with GraphQL and get the JSON output for that
-          product. Learn more about the{" "}
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-            target="_blank"
-          >
-            productCreate
-          </s-link>{" "}
-          mutation in our API references. Includes a product{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/build/custom-data/metafields"
-            target="_blank"
-          >
-            metafield
-          </s-link>{" "}
-          and{" "}
-          <s-link
-            href="https://shopify.dev/docs/apps/build/custom-data/metaobjects"
-            target="_blank"
-          >
-            metaobject
-          </s-link>
-          .
-        </s-paragraph>
-        <s-stack direction="inline" gap="base">
-          <s-button
-            onClick={generateProduct}
-            {...(isLoading ? { loading: true } : {})}
-          >
-            Generate a product
-          </s-button>
-          {fetcher.data?.product && (
-            <s-button
-              onClick={() => {
-                shopify.intents.invoke?.("edit:shopify/Product", {
-                  value: fetcher.data?.product?.id,
-                });
-              }}
-              target="_blank"
-              variant="tertiary"
-            >
-              Edit product
-            </s-button>
-          )}
-        </s-stack>
-        {fetcher.data?.product && (
-          <s-section heading="productCreate mutation">
-            <s-stack direction="block" gap="base">
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre
-                  style={{
-                    margin: 0,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  <code>{JSON.stringify(fetcher.data.product, null, 2)}</code>
-                </pre>
-              </s-box>
-
-              <s-heading>productVariantsBulkUpdate mutation</s-heading>
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre
-                  style={{
-                    margin: 0,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  <code>{JSON.stringify(fetcher.data.variant, null, 2)}</code>
-                </pre>
-              </s-box>
-
-              <s-heading>metaobjectUpsert mutation</s-heading>
-              <s-box
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <pre
-                  style={{
-                    margin: 0,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                  }}
-                >
-                  <code>
-                    {JSON.stringify(fetcher.data.metaobject, null, 2)}
-                  </code>
-                </pre>
-              </s-box>
-            </s-stack>
-          </s-section>
+        {report && (
+          <s-text color="subdued">
+            As of {formatAsOf(report.capturedAt)} · sampled {report.sampleSize} of{" "}
+            {report.totalProducts} products
+          </s-text>
         )}
       </s-section>
 
-      <s-section slot="aside" heading="App template specs">
-        <s-paragraph>
-          <s-text>Framework: </s-text>
-          <s-link href="https://reactrouter.com/" target="_blank">
-            React Router
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Interface: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/app-home/using-polaris-components"
-            target="_blank"
-          >
-            Polaris web components
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>API: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/api/admin-graphql"
-            target="_blank"
-          >
-            GraphQL
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Custom data: </s-text>
-          <s-link
-            href="https://shopify.dev/docs/apps/build/custom-data"
-            target="_blank"
-          >
-            Metafields &amp; metaobjects
-          </s-link>
-        </s-paragraph>
-        <s-paragraph>
-          <s-text>Database: </s-text>
-          <s-link href="https://www.prisma.io/" target="_blank">
-            Prisma
-          </s-link>
-        </s-paragraph>
-      </s-section>
+      {scanError && <ScanErrorSection onRetry={runScan} scanning={isScanning} />}
 
-      <s-section slot="aside" heading="Next steps">
-        <s-unordered-list>
-          <s-list-item>
-            Build an{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/getting-started/build-app-example"
-              target="_blank"
-            >
-              example app
-            </s-link>
-          </s-list-item>
-          <s-list-item>
-            Explore Shopify&apos;s API with{" "}
-            <s-link
-              href="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-              target="_blank"
-            >
-              GraphiQL
-            </s-link>
-          </s-list-item>
-        </s-unordered-list>
+      {!scanError && report && report.totalProducts === 0 && <FirstRunSection />}
+
+      {!scanError && report && report.totalProducts > 0 && (
+        <>
+          <HealthScoreSection report={report} />
+          {report.findings.length > 0 ? (
+            <TopFindingsSection report={report} />
+          ) : (
+            <HealthySection />
+          )}
+        </>
+      )}
+
+      <s-section slot="aside" heading="How scoring works">
+        <s-paragraph>
+          Your health score is a weighted blend of the domains we can assess from
+          your catalog — SEO, content, catalog quality, and inventory. Each
+          finding is ranked by impact, confidence, and how easy it is to fix.
+        </s-paragraph>
+        <s-paragraph color="subdued">
+          Deeper conversion and performance checks activate as more of your store
+          connects.
+        </s-paragraph>
       </s-section>
     </s-page>
+  );
+}
+
+function HealthScoreSection({ report }: { report: HealthReport }) {
+  return (
+    <s-section heading="Health score">
+      <s-stack direction="block" gap="base">
+        <s-stack direction="inline" gap="base" alignItems="center">
+          <s-badge tone={scoreTone(report.overallScore)} size="large">
+            {String(report.overallScore)}/100
+          </s-badge>
+          <s-text>{scoreLabel(report.overallScore)}</s-text>
+        </s-stack>
+
+        <s-stack direction="block" gap="small-300">
+          {report.domainScores.map((ds) => (
+            <s-box key={ds.domain}>
+              <s-text>{DOMAIN_LABELS[ds.domain] ?? ds.domain}: </s-text>
+              <s-badge tone={scoreTone(ds.score)}>{String(ds.score)}</s-badge>
+              {ds.findingCount > 0 && (
+                <s-text color="subdued">
+                  {" "}
+                  · {ds.findingCount} issue{ds.findingCount === 1 ? "" : "s"}
+                </s-text>
+              )}
+            </s-box>
+          ))}
+        </s-stack>
+      </s-stack>
+    </s-section>
+  );
+}
+
+function TopFindingsSection({ report }: { report: HealthReport }) {
+  const top = report.findings.slice(0, 5);
+  return (
+    <s-section heading="What to fix next">
+      <s-stack direction="block" gap="base">
+        {top.map((f) => (
+          <s-box
+            key={f.id}
+            padding="base"
+            borderWidth="base"
+            borderRadius="base"
+          >
+            <s-stack direction="block" gap="small-300">
+              <s-stack direction="inline" gap="small-300" alignItems="center">
+                <s-badge tone={SEVERITY_TONE[f.severity]}>{f.severity}</s-badge>
+                <s-heading>{f.title}</s-heading>
+              </s-stack>
+              <s-paragraph>{f.rationale}</s-paragraph>
+              <s-text color="subdued">
+                Affects {f.affectedCount} of {f.sampleSize} sampled ·{" "}
+                {DOMAIN_LABELS[f.domain] ?? f.domain}
+              </s-text>
+            </s-stack>
+          </s-box>
+        ))}
+        {report.findings.length > top.length && (
+          <s-text color="subdued">
+            +{report.findings.length - top.length} more finding
+            {report.findings.length - top.length === 1 ? "" : "s"}
+          </s-text>
+        )}
+      </s-stack>
+    </s-section>
+  );
+}
+
+function HealthySection() {
+  return (
+    <s-section heading="Your store looks healthy">
+      <s-stack direction="block" gap="base">
+        <s-paragraph>
+          No issues in this scan of your catalog. We&apos;ll keep monitoring and
+          surface anything worth your attention here.
+        </s-paragraph>
+      </s-stack>
+    </s-section>
+  );
+}
+
+function FirstRunSection() {
+  return (
+    <s-section heading="Add products to get started">
+      <s-stack direction="block" gap="base">
+        <s-paragraph>
+          Your store doesn&apos;t have any products yet. Once you add products,
+          run a Store Health scan and TryMerchantAI will surface the
+          highest-impact improvements across SEO, content, catalog, and
+          inventory.
+        </s-paragraph>
+        <s-box>
+          <s-link href="shopify://admin/products/new" target="_top">
+            Add your first product
+          </s-link>
+        </s-box>
+      </s-stack>
+    </s-section>
+  );
+}
+
+function ScanErrorSection({
+  onRetry,
+  scanning,
+}: {
+  onRetry: () => void;
+  scanning: boolean;
+}) {
+  return (
+    <s-section heading="We couldn't complete the scan">
+      <s-stack direction="block" gap="base">
+        <s-banner tone="critical" heading="Store Health scan failed">
+          <s-paragraph>
+            Something went wrong reading your store. Your data is unchanged. Try
+            running the scan again.
+          </s-paragraph>
+        </s-banner>
+        <s-box>
+          <s-button onClick={onRetry} {...(scanning ? { loading: true } : {})}>
+            Try again
+          </s-button>
+        </s-box>
+      </s-stack>
+    </s-section>
   );
 }
 

@@ -95,5 +95,5 @@ Multi-channel; SSO/SCIM; SOC2/ISO; data residency; localization; predictive. Dep
 | Shopify-native AI encroachment | orchestration + memory + outcome-proof moat (doc 03) |
 | Scope infinite ("forever") | thin verifiable slices; TodoWrite; per-increment DoD |
 
-## Current execution slice (this session)
-M0.T1 → M0.T5 (dependency-free foundation, compiles, no dev break) → M0.T6 verify → then M0.T7 staged cutover artifacts. Tracked in TodoWrite.
+## Current execution slice
+M0.T1–T5 foundation ☑, action pipeline (M1.T2) ☑, and **M1.T6 Dashboard ☑** (real Store Health quick scan replaces the template demo; `app/lib/domain/store-health` + `app/routes/app._index.tsx`). Next: **M0.T7 Postgres/Redis cutover** (artifacts ready) to unblock persistence, then M1.T7 Findings UI + Fix-it wired to the action pipeline. Live status tracked in `/project_state`.
