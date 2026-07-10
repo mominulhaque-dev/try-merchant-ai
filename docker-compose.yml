@@ -1,0 +1,52 @@
+# Local infrastructure for TryMerchantAI (docs/18, docs/17, docs/37).
+#
+# Brings up the Postgres 16 (with pgvector for AI memory, docs/31) and Redis 7
+# (queues/cache/locks, docs/17) that the production architecture requires, so
+# local `npm run dev` keeps working after the SQLite→Postgres cutover
+# (see docs/_IMPLEMENTATION/02_DB_CUTOVER.md).
+#
+#   docker compose up -d        # start db + redis
+#   npm run setup               # prisma generate + migrate deploy
+#   npm run dev                 # Shopify app dev, as before
+#
+# This file is additive and safe: it does not alter the app or its current
+# SQLite dev database until the cutover runbook is executed.
+
+services:
+  db:
+    # pgvector image ships Postgres 16 with the `vector` extension available.
+    image: pgvector/pgvector:pg16
+    container_name: trymerchantai-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trymerchantai
+      POSTGRES_PASSWORD: trymerchantai
+      POSTGRES_DB: trymerchantai
+    ports:
+      - "5432:5432"
+    volumes:
+      - trymerchantai_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trymerchantai -d trymerchantai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: trymerchantai-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - trymerchantai_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  trymerchantai_pgdata:
+  trymerchantai_redisdata:
