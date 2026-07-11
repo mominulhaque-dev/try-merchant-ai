@@ -255,6 +255,9 @@ function TopFindingsSection({ report }: { report: HealthReport }) {
             {report.findings.length - top.length === 1 ? "" : "s"}
           </s-text>
         )}
+        <s-box>
+          <s-link href="/app/findings">Review &amp; fix all findings</s-link>
+        </s-box>
       </s-stack>
     </s-section>
   );

@@ -1,11 +1,13 @@
 # Active Task
 
-**M1.T6 — Real Store Health Dashboard** (docs/14). ✅ Done this session.
+**M1.T7 — Findings UI + Fix-it wired to the action pipeline** (docs/07 F-02, docs/14, docs/16). ✅ Done this session.
 
-Replaced the Shopify template demo in `app/routes/app._index.tsx` with a production dashboard driven by a real, bounded Store Health quick scan:
+Wired the reversibility spine end-to-end behind real in-memory adapters, before the DB cutover:
 
-- `app/lib/domain/store-health/` — pure `scoreSnapshot` (deterministic, unit-tested) + `captureStoreSnapshot` (read-only Admin GraphQL, bounded sample).
-- Dashboard states per docs/14: first-run (no products), healthy (no findings), steady (ranked findings), section-level scan error. Live "Run scan" via `useFetcher`.
-- Removed dead template route `app.additional.tsx`; trimmed nav to real routes.
+- `app/lib/agents/adapters/in-memory.server.ts` — real `InMemoryActionStore`, `InMemoryAuditLog`, `KeyedMutexLock` (per-key single-writer), `InMemoryBudget`. Process-lifetime, tenant-isolated, unit-tested.
+- `app/lib/domain/store-health/fix.ts` — pure fix registry mapping a `HealthFinding` → typed, gated, reversible `ActionProposal` + deterministic diff + tool-catalog requirement (advisory findings return null).
+- `app/lib/domain/store-health/fix.server.ts` — composes the pipeline with the in-memory adapters + a `SimulatedFixExecutor` (drafts/records, no live write yet); exposes `previewFinding`/`executeFinding`/`undoFinding` + UI read helpers.
+- `app/lib/security/entitlements.server.ts` — real granted scopes from the session; documented pre-billing plan/role defaults.
+- `app/routes/app.findings.tsx` — preview → approve → execute → undo per fixable finding, advisory list, recent-activity audit aside. Dashboard + nav link to it.
 
-**Verification owed (env-blocked this session):** run `npm run typecheck`, `npm run lint`, `npm run test`, `npm run dev`. Props were checked against `@shopify/polaris-types` by hand (notably `color="subdued"`, not `tone`).
+**Verification (ran this session):** `npm run typecheck` ✅ · `npm run test` ✅ (54 tests, 7 files). `npm run lint` is env-blocked (`ERR_DLOPEN_FAILED` in the TS import-resolver native addon — Node-ABI/MSVC issue, not code); manual review done against the ESLint config. Fixed `tsconfig.json` (`ignoreDeprecations` "6.0"→"5.0", removed unused deprecated `baseUrl`) which had been breaking `npm run typecheck`.

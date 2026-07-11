@@ -6,4 +6,6 @@ Why next: every persistent feature (repositories, persisted scans → history, f
 
 If Docker is unavailable, the best non-blocked increment is:
 
-**M1.T7 — Findings UI + persistence-ready detail** and wiring the dashboard "Fix it" into the existing action pipeline (`app/lib/agents/action-pipeline.server.ts`) with in-memory adapters, so the reversible preview→approve→execute→undo loop is exercised end-to-end before the DB lands.
+**M0.T9 — AI provider abstraction** (Anthropic/OpenAI, structured + streaming, failover per `AgentSpec.model`, token/AAC metering hooks). No Docker needed; it unblocks the Copilot chat and the real content/SEO drafting that the Fix-it `SimulatedFixExecutor` will call once the Shopify write adapter lands. Prefer the latest Claude models (Opus 4.8 / Sonnet 5 / Haiku 4.5) as defaults.
+
+(M1.T7 Findings UI + Fix-it loop is now done — see ACTIVE_TASK.)
