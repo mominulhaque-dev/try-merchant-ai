@@ -44,7 +44,7 @@ export const AGENT_IDS: readonly AgentId[] = [
   "recommendation",
 ] as const;
 
-export type ModelProvider = "anthropic" | "openai";
+export type ModelProvider = "anthropic" | "openai" | "google";
 
 export interface ModelRef {
   readonly provider: ModelProvider;

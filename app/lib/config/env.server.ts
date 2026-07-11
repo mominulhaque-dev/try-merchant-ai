@@ -36,6 +36,8 @@ export interface ServerConfig {
   readonly ai: {
     readonly anthropicApiKey: string | undefined;
     readonly openaiApiKey: string | undefined;
+    /** Google AI Studio (Gemini) key; accepts GOOGLE_API_KEY or GEMINI_API_KEY. */
+    readonly googleApiKey: string | undefined;
   };
 }
 
@@ -68,6 +70,7 @@ function build(): ServerConfig {
     ai: {
       anthropicApiKey: readEnv("ANTHROPIC_API_KEY"),
       openaiApiKey: readEnv("OPENAI_API_KEY"),
+      googleApiKey: readEnv("GOOGLE_API_KEY") ?? readEnv("GEMINI_API_KEY"),
     },
   };
 }

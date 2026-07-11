@@ -14,7 +14,7 @@ import type { TrustLevel } from "../domain/enums";
 
 // Model tiers (docs/16 ADR-016-2). Cheap tier handles classification/formatting;
 // primary handles reasoning/planning; fallback is the cross-provider failover.
-const PRIMARY: ModelRef = { provider: "anthropic", model: "claude-sonnet-4-6" };
+const PRIMARY: ModelRef = { provider: "anthropic", model: "claude-sonnet-5" };
 const FALLBACK: ModelRef = { provider: "openai", model: "gpt-4.1" };
 const CHEAP: ModelRef = { provider: "anthropic", model: "claude-haiku-4-5" };
 

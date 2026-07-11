@@ -11,7 +11,7 @@ Legend: ☑ done · ◐ in progress · ☐ todo. Milestones per `docs/_IMPLEMENT
 - ☑ M0.T6 Verify foundation (`typecheck` + `test` now run green; `lint` env-blocked by a native-addon ABI issue)
 - ☐ M0.T7 Postgres + Redis cutover (artifacts ready, not applied)
 - ☐ M0.T8 Queue infra + worker
-- ☐ M0.T9 AI provider abstraction
+- ◐ M0.T9 AI provider abstraction (`app/lib/ai`): vendor-neutral port, Anthropic (SDK) + OpenAI (fetch) adapters, tiering + failover + AAC metering + budget guard — tested. OpenAI adapter untested vs a live endpoint; MCP tool exposure lands with M1.T4.
 
 ## M1 — Wedge MVP
 - ◐ M1.T2 Action pipeline (built + tested; real in-memory adapters live, Prisma/Shopify adapters land with DB)
@@ -25,3 +25,4 @@ Legend: ☑ done · ◐ in progress · ☐ todo. Milestones per `docs/_IMPLEMENT
 - ☑ Agents fleet UI (`app.agents.tsx`)
 - ☑ Store Health quick-scan module + tests (`app/lib/domain/store-health`)
 - ☑ In-memory action-pipeline adapters + fix registry + tests (`app/lib/agents/adapters`, `app/lib/domain/store-health/fix*`)
+- ◐ AI provider abstraction (`app/lib/ai`): types/port, error mapping, Anthropic + OpenAI adapters, `AIService` (failover/tiering/metering) + tests

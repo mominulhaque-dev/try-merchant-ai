@@ -128,7 +128,7 @@ function num(form: FormData, key: string): number {
 }
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<FindingActionResult> => {
-  const { admin, session } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const shop = assertShop(session.shop);
   const entitlements = resolveEntitlements(session);
   const traceId = newTraceId();
