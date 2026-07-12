@@ -29,6 +29,12 @@ export {
 } from "./service.server";
 export { mapProviderError } from "./errors.server";
 export { AnthropicProvider } from "./providers/anthropic.server";
+export {
+  OpenAICompatibleProvider,
+  type OpenAICompatibleConfig,
+} from "./providers/openai-compatible.server";
 export { OpenAIProvider } from "./providers/openai.server";
 export { GoogleProvider } from "./providers/google.server";
+export { QwenProvider } from "./providers/qwen.server";
+export { HuggingFaceProvider } from "./providers/huggingface.server";
 export { buildProviders, hasAnyProvider } from "./factory.server";

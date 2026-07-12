@@ -38,6 +38,12 @@ export interface ServerConfig {
     readonly openaiApiKey: string | undefined;
     /** Google AI Studio (Gemini) key; accepts GOOGLE_API_KEY or GEMINI_API_KEY. */
     readonly googleApiKey: string | undefined;
+    /** Qwen (DashScope) key; accepts QWEN_API_KEY or DASHSCOPE_API_KEY. */
+    readonly qwenApiKey: string | undefined;
+    /** Optional Qwen endpoint override (e.g. the China DashScope host). */
+    readonly qwenBaseUrl: string | undefined;
+    /** Hugging Face token; accepts HF_API_KEY or HUGGINGFACE_API_KEY. */
+    readonly hfApiKey: string | undefined;
   };
 }
 
@@ -71,6 +77,9 @@ function build(): ServerConfig {
       anthropicApiKey: readEnv("ANTHROPIC_API_KEY"),
       openaiApiKey: readEnv("OPENAI_API_KEY"),
       googleApiKey: readEnv("GOOGLE_API_KEY") ?? readEnv("GEMINI_API_KEY"),
+      qwenApiKey: readEnv("QWEN_API_KEY") ?? readEnv("DASHSCOPE_API_KEY"),
+      qwenBaseUrl: readEnv("QWEN_BASE_URL"),
+      hfApiKey: readEnv("HF_API_KEY") ?? readEnv("HUGGINGFACE_API_KEY"),
     },
   };
 }

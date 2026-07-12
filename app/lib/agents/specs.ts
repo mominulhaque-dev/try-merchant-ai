@@ -14,9 +14,12 @@ import type { TrustLevel } from "../domain/enums";
 
 // Model tiers (docs/16 ADR-016-2). Cheap tier handles classification/formatting;
 // primary handles reasoning/planning; fallback is the cross-provider failover.
+// The cheap tier runs on Qwen (OpenAI-compatible) to keep classification COGS
+// low; if `QWEN_API_KEY` is unset the `AIService` fails cheap-tier calls over to
+// the primary (Claude), so nothing breaks without the key.
 const PRIMARY: ModelRef = { provider: "anthropic", model: "claude-sonnet-5" };
 const FALLBACK: ModelRef = { provider: "openai", model: "gpt-4.1" };
-const CHEAP: ModelRef = { provider: "anthropic", model: "claude-haiku-4-5" };
+const CHEAP: ModelRef = { provider: "qwen", model: "qwen-turbo" };
 
 const MODELS = { primary: PRIMARY, fallback: FALLBACK, cheap: CHEAP } as const;
 

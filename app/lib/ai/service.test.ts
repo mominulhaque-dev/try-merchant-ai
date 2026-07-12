@@ -154,13 +154,15 @@ describe("AIService.complete", () => {
   });
 
   it("resolves the requested tier from the agent spec", async () => {
-    const cheap = new FakeProvider("anthropic", { kind: "ok", text: "cheap tier" });
+    const cheapRef = AGENT_SPECS.seo.model.cheap;
+    const cheap = new FakeProvider(cheapRef.provider, { kind: "ok", text: "cheap tier" });
     const budget = new RecordingBudget();
-    const service = new AIService({ providers: { anthropic: cheap }, budget });
+    // Register the provider under the cheap tier's own provider id (tier-agnostic).
+    const service = new AIService({ providers: { [cheapRef.provider]: cheap }, budget });
 
     const result = await service.complete(ctx("cheap"), req());
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value.model).toBe(AGENT_SPECS.seo.model.cheap.model);
+    if (result.ok) expect(result.value.model).toBe(cheapRef.model);
   });
 
   it("returns PROVIDER_UNAVAILABLE when no provider is configured", async () => {

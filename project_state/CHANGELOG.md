@@ -2,6 +2,9 @@
 
 > Terse, newest first. Full narrative history is in root `CHANGELOG.md`.
 
+## 2026-07-12 (AI providers)
+- Added a **Google (Gemini) provider** (`app/lib/ai/providers/google.server.ts`) on the Generative Language REST API via `fetch` (no new dep), same `AIProvider` port + streaming (`alt=sse`) + structured output (`responseSchema`) + normalized usage/stop-reason. Extended `ModelProvider` with `"google"`; wired `GOOGLE_API_KEY`/`GEMINI_API_KEY` into config + factory + `.env.example`. Kept as an available **fallback** — agent tiers stay Claude-primary (per CLAUDE.md); point a `ModelRef` at `{provider:"google", model:"gemini-…"}` to use it. 6 unit tests (fake `fetch`): candidate/usage mapping, MAX_TOKENS/SAFETY stop reasons, structured parse, 429→RATE_LIMITED, SSE streaming.
+
 ## 2026-07-12 (M1.T8)
 - Added the Copilot chat (docs/15): a streaming, grounded conversational surface — the first end-to-end exercise of the AI abstraction (`app/lib/ai`).
 - `app/lib/ai/copilot.server.ts`: composed `AIService` singleton + a per-shop in-memory AAC meter (`InMemoryCopilotBudget`); pure builders for the grounding block, system prompt (store-health charter + copilot notes + fenced/untrusted scan data), findings-derived suggested prompts, SSE encoder, and untrusted-history clamping; `streamCopilotReply` orchestration (injectable service for tests).

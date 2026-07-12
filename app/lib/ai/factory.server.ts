@@ -4,6 +4,8 @@ import type { AIProvider } from "./types";
 import { AnthropicProvider } from "./providers/anthropic.server";
 import { OpenAIProvider } from "./providers/openai.server";
 import { GoogleProvider } from "./providers/google.server";
+import { QwenProvider } from "./providers/qwen.server";
+import { HuggingFaceProvider } from "./providers/huggingface.server";
 
 /**
  * Build the configured provider set from validated env (docs/37, docs/16).
@@ -26,6 +28,12 @@ export function buildProviders(): Partial<Record<ModelProvider, AIProvider>> {
   if (cfg.ai.googleApiKey) {
     providers.google = new GoogleProvider(cfg.ai.googleApiKey);
   }
+  if (cfg.ai.qwenApiKey) {
+    providers.qwen = new QwenProvider(cfg.ai.qwenApiKey, cfg.ai.qwenBaseUrl);
+  }
+  if (cfg.ai.hfApiKey) {
+    providers.huggingface = new HuggingFaceProvider(cfg.ai.hfApiKey);
+  }
 
   return providers;
 }
@@ -33,5 +41,8 @@ export function buildProviders(): Partial<Record<ModelProvider, AIProvider>> {
 /** True when at least one model provider is configured (docs/40 degraded UX). */
 export function hasAnyProvider(): boolean {
   const cfg = getConfig();
-  return Boolean(cfg.ai.anthropicApiKey || cfg.ai.openaiApiKey || cfg.ai.googleApiKey);
+  const ai = cfg.ai;
+  return Boolean(
+    ai.anthropicApiKey || ai.openaiApiKey || ai.googleApiKey || ai.qwenApiKey || ai.hfApiKey,
+  );
 }
