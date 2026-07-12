@@ -2,6 +2,13 @@
 
 > Terse, newest first. Full narrative history is in root `CHANGELOG.md`.
 
+## 2026-07-12 (M1.T8)
+- Added the Copilot chat (docs/15): a streaming, grounded conversational surface — the first end-to-end exercise of the AI abstraction (`app/lib/ai`).
+- `app/lib/ai/copilot.server.ts`: composed `AIService` singleton + a per-shop in-memory AAC meter (`InMemoryCopilotBudget`); pure builders for the grounding block, system prompt (store-health charter + copilot notes + fenced/untrusted scan data), findings-derived suggested prompts, SSE encoder, and untrusted-history clamping; `streamCopilotReply` orchestration (injectable service for tests).
+- `app/routes/app.copilot.tsx`: loader grounds via the live quick scan + returns suggestions; `action` returns an SSE `ReadableStream` driven by `streamCopilotReply`; `s-*` chat UI with token-by-token streaming (raw `fetch` + `AbortController` stop), suggested-prompt empty state, degraded/no-provider + scan-error banners, and an `aria-live` transcript. Writes stay on the Findings page (no tools exposed to the model yet).
+- Wired Copilot into the app nav and added a dashboard quick-entry.
+- 11 unit tests (`app/lib/ai/copilot.test.ts`): grounding, prompt assembly, suggestions, SSE encoding, history clamping, streaming + budget block via a fake provider. `typecheck` ✅ · `test` ✅ (88 total) · `build` ✅. No live model call (no API key in this env).
+
 ## 2026-07-11 (M0.T9)
 - Added the AI provider abstraction (`app/lib/ai`, docs/16 ADR-016-2): vendor-neutral `AIProvider` port + `CompletionRequest/Result` contracts (`types.ts`).
 - Anthropic adapter (`providers/anthropic.server.ts`) on the official `@anthropic-ai/sdk` (added dep): adaptive thinking, effort knob, structured output via `output_config.format`, streaming, normalized usage — no `temperature`/`budget_tokens` (rejected on Opus 4.8).

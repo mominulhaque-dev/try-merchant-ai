@@ -162,6 +162,9 @@ export default function Dashboard() {
             {report.totalProducts} products
           </s-text>
         )}
+        <s-box>
+          <s-link href="/app/copilot">Ask the Copilot about your store</s-link>
+        </s-box>
       </s-section>
 
       {scanError && <ScanErrorSection onRetry={runScan} scanning={isScanning} />}
