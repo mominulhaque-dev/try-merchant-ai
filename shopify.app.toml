@@ -19,6 +19,20 @@ topics = ["app/scopes_update"]
 uri = "/webhooks/app/uninstalled"
 topics = ["app/uninstalled"]
 
+# Mandatory GDPR compliance webhooks (docs/24, docs/43/44) — required for App
+# Store approval. Handlers verify HMAC, audit, and 200-ack (500 → Shopify retry).
+[[webhooks.subscriptions]]
+uri = "/webhooks/customers/data_request"
+compliance_topics = ["customers/data_request"]
+
+[[webhooks.subscriptions]]
+uri = "/webhooks/customers/redact"
+compliance_topics = ["customers/redact"]
+
+[[webhooks.subscriptions]]
+uri = "/webhooks/shop/redact"
+compliance_topics = ["shop/redact"]
+
 [access_scopes]
 scopes = "read_products,write_products,read_metaobjects,write_metaobjects,read_files,write_files"
 

@@ -20,7 +20,8 @@ Legend: ☑ done · ◐ in progress · ☐ todo. Milestones per `docs/_IMPLEMENT
 - ☑ M1.T7 Findings UI + Fix-it loop (`app.findings.tsx`) wired to the pipeline via in-memory adapters (preview→approve→execute→undo). Shopify write executor pending.
 - ☑ M1.T8 Copilot chat (`app.copilot.tsx` + `app/lib/ai/copilot.server.ts`): streaming SSE replies grounded in the live Store-Health scan, wired to `AIService` (tiering/failover/AAC metering); degraded-mode + no-provider fallbacks; writes stay on Findings. Model tool exposure deferred to M1.T4; live path needs an API key.
 - ☑ M1.T11 Nav IA (Home + Copilot + Findings + Agents; extends as routes land)
-- ☐ M1.T1 Repositories · T3 Policy runtime wiring · T4 Tool impls (real Shopify executor) · T9 Domain agents · T10 Billing · T12 GDPR · T13 Analytics
+- ☑ M1.T12 GDPR/compliance webhooks (`webhooks.customers.data_request|redact`, `webhooks.shop.redact`) + `compliance_topics` in toml; port-based, HMAC-verified, audited, retry-on-500. No customer PII stored → customer handlers are honest acks; shop/redact deletes sessions.
+- ☐ M1.T1 Repositories · T3 Policy runtime wiring · T4 Tool impls (real Shopify executor) · T9 Domain agents · T10 Billing · T13 Analytics
 
 ## Also present
 - ☑ Agents fleet UI (`app.agents.tsx`)

@@ -2,6 +2,11 @@
 
 > Terse, newest first. Full narrative history is in root `CHANGELOG.md`.
 
+## 2026-07-12 (M1.T12 — GDPR compliance webhooks)
+- Implemented the three mandatory compliance webhooks (docs/24/43/44), launch-blocking for App Store approval: `webhooks.customers.data_request`, `webhooks.customers.redact`, `webhooks.shop.redact`. Each HMAC-verifies (`authenticate.webhook`), audits via the scrubbing logger, 200-acks, and returns 500 on failure so Shopify retries.
+- Enabled `compliance_topics` subscriptions in `shopify.app.toml`.
+- Port-based, testable core (`app/lib/domain/compliance/gdpr.server.ts`): `ComplianceStore` + `redactShop`/`redactCustomer`/`collectCustomerData` + payload extractors, with a `prismaComplianceStore`. `shop/redact` deletes the shop's `Session` rows; the app persists no customer PII yet, so the `customers/*` handlers are honest acks that gain real deletions unchanged when customer tables land (docs/18). 8 unit tests with a fake store.
+
 ## 2026-07-12 (AI providers — OpenAI-compatible + cheap tier)
 - Factored the OpenAI adapter into a shared **`OpenAICompatibleProvider`** base (`providers/openai-compatible.server.ts`) parametrized by id/baseURL/token-field — no logic duplication (CLAUDE.md). `OpenAIProvider` is now a thin config of it.
 - Added **Qwen** (`providers/qwen.server.ts`, DashScope compatible-mode; `QWEN_BASE_URL` override for the China host) and **Hugging Face** (`providers/huggingface.server.ts`, HF router endpoint) providers — both thin configs of the base. Extended `ModelProvider` with `"qwen"`/`"huggingface"`; wired `QWEN_API_KEY`/`DASHSCOPE_API_KEY` + `HF_API_KEY`/`HUGGINGFACE_API_KEY` into config + factory + `.env.example`.
