@@ -2,6 +2,12 @@
 
 > Terse, newest first. Full narrative history is in root `CHANGELOG.md`.
 
+## 2026-07-12 (AI providers — OpenAI-compatible + cheap tier)
+- Factored the OpenAI adapter into a shared **`OpenAICompatibleProvider`** base (`providers/openai-compatible.server.ts`) parametrized by id/baseURL/token-field — no logic duplication (CLAUDE.md). `OpenAIProvider` is now a thin config of it.
+- Added **Qwen** (`providers/qwen.server.ts`, DashScope compatible-mode; `QWEN_BASE_URL` override for the China host) and **Hugging Face** (`providers/huggingface.server.ts`, HF router endpoint) providers — both thin configs of the base. Extended `ModelProvider` with `"qwen"`/`"huggingface"`; wired `QWEN_API_KEY`/`DASHSCOPE_API_KEY` + `HF_API_KEY`/`HUGGINGFACE_API_KEY` into config + factory + `.env.example`.
+- **Routed the cheap tier to Qwen** (`specs.ts`: cheap = `qwen-turbo`) to cut classification COGS; falls over to Claude primary when `QWEN_API_KEY` is unset. Made the service tier test provider-agnostic.
+- 6 new tests (`providers/openai-compatible.test.ts`): endpoint/bearer/token-field per vendor, base-url override, 429→RATE_LIMITED, SSE streaming.
+
 ## 2026-07-12 (AI providers)
 - Added a **Google (Gemini) provider** (`app/lib/ai/providers/google.server.ts`) on the Generative Language REST API via `fetch` (no new dep), same `AIProvider` port + streaming (`alt=sse`) + structured output (`responseSchema`) + normalized usage/stop-reason. Extended `ModelProvider` with `"google"`; wired `GOOGLE_API_KEY`/`GEMINI_API_KEY` into config + factory + `.env.example`. Kept as an available **fallback** — agent tiers stay Claude-primary (per CLAUDE.md); point a `ModelRef` at `{provider:"google", model:"gemini-…"}` to use it. 6 unit tests (fake `fetch`): candidate/usage mapping, MAX_TOKENS/SAFETY stop reasons, structured parse, 429→RATE_LIMITED, SSE streaming.
 
